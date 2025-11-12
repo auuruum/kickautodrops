@@ -44,7 +44,7 @@ jobs:
       if: runner.os == 'Linux'
       run: |
         cd dist
-        chmod +x index
+        chmod +x KickAutoDrops
         tar -czf ../KickAutoDrops-linux.tar.gz KickAutoDrops example_config.ini locales/
     
     - name: Upload Windows artifact
