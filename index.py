@@ -168,7 +168,17 @@ async def show_menu():
     while True:
         for key, (label, _) in menu_items.items():
             print(f"{key}. {label}")
-        choice = input(tl.c['select_menu']).strip()
+        # Wait for user input with a 10-second timeout. If nothing is entered,
+        # default to option "1" (start_streamers_drops).
+        try:
+            choice = await asyncio.wait_for(asyncio.to_thread(input, tl.c['select_menu']), timeout=10)
+            choice = choice.strip()
+            if choice == "":
+                print("\nNo input detected, defaulting to option 1.")
+                choice = "1"
+        except asyncio.TimeoutError:
+            print("\nNo selection in 10 seconds, defaulting to option 1.")
+            choice = "1"
 
         if choice == "0":
             break
