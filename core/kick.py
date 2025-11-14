@@ -37,6 +37,61 @@ def get_all_campaigns():
     
     return data
 
+def get_drops_progress(cookies, max_attempts=3):
+    # Извлекаем session_token из cookies для Authorization
+    session_token = cookies.get('session_token')
+    if not session_token:
+        print(f"{tl.c['session_token_notfound_in_cookies']}")
+        return None
+    
+    print(f"{tl.c['session_token_found']} {session_token[:30]}...")
+    
+    for attempt in range(max_attempts):
+        s = requests.Session(impersonate="chrome120")
+        
+        # Устанавливаем cookies
+        s.cookies.update(cookies)
+        
+        try:
+            
+            s.headers.update({
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36',
+                'Accept': 'application/json',
+                'Accept-Language': 'ru-RU,ru;q=0.8',
+                'Accept-Encoding': 'gzip, deflate, br, zstd',
+                'Authorization': f'Bearer {session_token}',
+                'X-Client-Token': 'e1393935a959b4020a4491574f6490129f678acdaa92760471263db43487f823',
+                'Cache-Control': 'max-age=0',
+                'Referer': 'https://kick.com/',
+                'Origin': 'https://kick.com',
+                'Sec-Fetch-Dest': 'empty',
+                'Sec-Fetch-Mode': 'cors',
+                'Sec-Fetch-Site': 'same-site',
+                'Sec-Ch-Ua': '"Chromium";v="142", "Google Chrome";v="142", "Not_A Brand";v="99"',
+                'Sec-Ch-Ua-Mobile': '?0',
+                'Sec-Ch-Ua-Platform': '"Windows"',
+                'Priority': 'u=1, i'
+            })
+            
+            response = s.get('https://web.kick.com/api/v1/drops/progress', timeout=10)
+            
+            if response.status_code == 200:
+                return response.json()
+            else:
+                print(f"✗ Error while requesting: {response.status_code}")
+                if attempt < max_attempts - 1:
+                    print("Trying again...")
+                    
+        except Exception as e:
+            print(f"✗ Error while requesting: {e}")
+            if attempt < max_attempts - 1:
+                print("Trying again...")
+        finally:
+            s.close()
+    
+    print("Failed to retrieve data after all attempts")
+    return None
+
 def get_random_stream_from_category(category_id: int, limit: int = 10) -> dict:
     headers = DEFAULT_HEADERS
     # thanks mobile version site

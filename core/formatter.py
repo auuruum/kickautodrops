@@ -1,5 +1,71 @@
 import json
 from core import tl
+import json
+
+def sync_drops_data(server_data, filepath="current_views.json"):
+    try:
+        # Load local JSON
+        print(f"Loading local JSON from {filepath}...")
+        with open(filepath, 'r', encoding='utf-8') as f:
+            local_data = json.load(f)
+        
+        # Create a copy of local data
+        updated_data = json.loads(json.dumps(local_data))
+        
+        # Dictionary for quick reward lookup
+        server_rewards_map = {}
+        
+        # Collect all rewards from all server campaigns
+        if 'data' in server_data and isinstance(server_data['data'], list):
+            
+            for idx, campaign in enumerate(server_data['data']):
+                print(f"  Processing campaign {idx}: {campaign.get('name', 'Unnamed')}")
+                
+                if 'rewards' in campaign and isinstance(campaign['rewards'], list):
+                    print(f"    Rewards found: {len(campaign['rewards'])}")
+                    
+                    for reward in campaign['rewards']:
+                        # Keep only claimed = True and progress = 1
+                        if reward.get('claimed') is True and reward.get('progress') == 1:
+                            server_rewards_map[reward['id']] = {
+                                'claimed': reward['claimed'],
+                                'progress': reward['progress'],
+                                'external_id': reward.get('external_id'),
+                                'name': reward.get('name')
+                            }
+                            print(f"✓ Added claimed reward: {reward.get('name')} (ID: {reward['id']})")
+        
+        # Update local data
+        updated_count = 0
+        if 'data' in updated_data and 'planned' in updated_data['data']:
+            for item in updated_data['data']['planned']:
+                item_id = item.get('id')
+                if item_id in server_rewards_map:
+                    item['claim'] = 1
+                    updated_count += 1
+                    print(f"✓ Updated drop ID: {item_id} (claim: 0 → 1)")
+        
+        print(f"\nTotal updated: {updated_count} drops")
+        
+        # Save updated data
+        print(f"Saving data to {filepath}...")
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(updated_data, f, ensure_ascii=False, indent=4)
+        
+        print(f"✓ Data successfully saved to {filepath}")
+        return True
+        
+    except FileNotFoundError:
+        print(f"✗ Error: file {filepath} not found")
+        return False
+    except json.JSONDecodeError as e:
+        print(f"✗ JSON read error: {e}")
+        return False
+    except Exception as e:
+        print(f"✗ Synchronization error: {e}")
+        return False
+
+
 def convert_drops_json(drops_data):
     result = {
         "data": {
@@ -17,27 +83,28 @@ def convert_drops_json(drops_data):
         if category_id is None:
             continue
         
+        
         # Проверяем наличие channels
         channels = campaign.get('channels', [])
         
-        # Считаем общее количество required_units из rewards
-        total_required_units = 0
-        rewards = campaign.get('rewards', [])
-        for reward in rewards:
-            required_units = reward.get('required_units', 0)
-            total_required_units += required_units
-        
-        # Если channels пустой - это type 2
+        # Если channels пустой - это type 2 (создаем запись для каждой награды)
         if not channels or len(channels) == 0:
-            planned_item = {
-                "category_id": category_id,
-                "type": 2,
-                "claim": 0,
-                "required_units": total_required_units
-            }
-            result['data']['planned'].append(planned_item)
+            rewards = campaign.get('rewards', [])
+            
+            for reward in rewards:
+                reward_id = reward.get('id')
+                required_units = reward.get('required_units', 0)
+                
+                planned_item = {
+                    "category_id": category_id,
+                    "type": 2,
+                    "claim": 0,
+                    "required_units": required_units,
+                    "id": reward_id  # ID конкретной награды
+                }
+                result['data']['planned'].append(planned_item)
         
-        # Если channels не пустой - это type 1
+        # Если channels не пустой - это type 1 (одна запись на всю кампанию)
         else:
             usernames = []
             for channel in channels:
@@ -45,18 +112,29 @@ def convert_drops_json(drops_data):
                 if slug:
                     usernames.append(slug)
             
+            # Считаем общее количество required_units из всех rewards
+            total_required_units = 0
+            rewards = campaign.get('rewards', [])
+            
+            for reward in rewards:
+                required_units = reward.get('required_units', 0)
+                total_required_units += required_units
+                reward_id = reward.get('id')
             planned_item = {
                 "category_id": category_id,
                 "type": 1,
                 "claim": 0,
                 "usernames": usernames,
-                "required_units": total_required_units
+                "required_units": total_required_units,
+                "id": reward_id  # ID кампании
             }
             result['data']['planned'].append(planned_item)
     
     # Сохраняем результат
-            with open('current_views.json', 'w', encoding='utf-8') as f:
-                json.dump(result, f, ensure_ascii=False, indent=4)
+    with open('current_views.json', 'w', encoding='utf-8') as f:
+        json.dump(result, f, ensure_ascii=False, indent=4)
+    
+    return result
 
 
 def collect_usernames(json_filename='current_views.json'):
@@ -67,10 +145,12 @@ def collect_usernames(json_filename='current_views.json'):
     for item in data['data']['planned']:
         if 'usernames' in item:
             required_minutes = item.get('required_units', 0)
+            claim_status = item.get('claim')
             for username in item['usernames']:
                 streamers_data.append({
                     'username': username,
-                    'required_seconds': required_minutes * 60
+                    'required_seconds': required_minutes * 60,
+                    'claim': claim_status
                 })
     
     return streamers_data
