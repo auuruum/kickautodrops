@@ -5,6 +5,7 @@ from core import tl
 from core import kick
 from core import view_controller
 from core import formatter
+from core import cookies_manager
 from functools import partial
 
 async def create_file_tasks():
@@ -76,7 +77,13 @@ async def start_streamer_drops():
         for streamer in streamers_data:
             username = streamer['username']
             required_seconds = streamer['required_seconds']
+            claim_status = streamer['claim']
             
+            # Проверяем, нужно ли получать дроп
+            if claim_status == 1:
+                print(tl.c["streamer_time_skip"].format(username=username))
+                continue
+
             # Проверяем, осталось ли время для просмотра
             remaining = await formatter.get_remaining_time(username)
             if remaining <= 0:
@@ -139,7 +146,12 @@ async def show_menu():
         await create_file_tasks()
     else:
         print(tl.c['file_view_found'])
-    
+
+    await asyncio.sleep(3)
+
+    # check drops 
+    await view_controller.check_campaigns_claim_status()
+
     menu_items = {
         "1": (tl.c['start_streamers_drops'], lambda: start_streamer_drops()),
         "2": (tl.c['start_general_drops'], lambda: start_general_drops()),

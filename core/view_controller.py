@@ -2,6 +2,7 @@ import asyncio
 from core import tl
 from core import cookies_manager
 from core import kick
+from core import formatter
 
 
 async def view_stream(username, category_id):
@@ -10,6 +11,11 @@ async def view_stream(username, category_id):
     streamerid = kick.get_channel_id(username)
     status = await kick.connection_channel(streamerid, username, category_id, token)
     return status
+
+async def check_campaigns_claim_status():
+    cookies = cookies_manager.load_cookies("cookies.txt")
+    kickdata = kick.get_drops_progress(cookies)
+    formatter.sync_drops_data(kickdata)
 
 async def sleeping_director_list(category_id, streamers):
     for username in streamers:
